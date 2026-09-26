@@ -51,7 +51,7 @@ document.addEventListener('click', (e) => {
 // Auth Submit
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const username = usernameInput.value;
+    const username = usernameInput.value.trim();
     const password = passwordInput.value;
     const endpoint = isLoginMode ? '/api/auth/login' : '/api/auth/register';
 
@@ -66,12 +66,12 @@ authForm.addEventListener('submit', async (e) => {
 
         if (isLoginMode) {
             token = data.token;
-            currentUser = username;
+            currentUser = data.username;
             localStorage.setItem('token', token);
             localStorage.setItem('username', currentUser);
             showDashboard();
         } else {
-            alert('Registration successful! Please login.');
+            alert('Registration successful! Please login now.');
             isLoginMode = true;
             authBtn.textContent = 'Login';
             authTitle.textContent = 'Sign in to manage your workflow';
@@ -106,7 +106,13 @@ async function fetchTasks() {
         const res = await fetch('/api/tasks', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!res.ok) throw new Error('Failed to fetch tasks');
+        if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+                logoutBtn.click(); // Token expired or invalid
+                return;
+            }
+            throw new Error('Failed to fetch tasks');
+        }
         allTasks = await res.json();
         filterAndRenderTasks();
     } catch (err) {
@@ -125,7 +131,6 @@ function filterAndRenderTasks() {
         return matchesSearch && matchesStatus;
     });
 
-    // Update stats counters
     statTotal.textContent = allTasks.length;
     statPending.textContent = allTasks.filter(t => t.status === 'Pending' || t.status === 'In Progress').length;
     statCompleted.textContent = allTasks.filter(t => t.status === 'Completed').length;
@@ -162,9 +167,8 @@ function escapeAttr(str) {
     return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
-// Search and Filter Listeners
-searchInput.addEventListener('input', filterAndRenderTasks);
-filterStatus.addEventListener('change', filterAndRenderTasks);
+if (searchInput) searchInput.addEventListener('input', filterAndRenderTasks);
+if (filterStatus) filterStatus.addEventListener('change', filterAndRenderTasks);
 
 // Create / Update Task
 taskForm.addEventListener('submit', async (e) => {
