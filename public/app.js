@@ -3,11 +3,7 @@ const API_URL = '/api';
 // DOM Elements
 const authSection = document.getElementById('auth-section');
 const dashboardSection = document.getElementById('dashboard-section');
-const authForm = document.getElementById('auth-form');
-const authTitle = document.getElementById('auth-subtitle');
 const authBtn = document.getElementById('auth-btn');
-const authSwitchText = document.getElementById('auth-switch-text');
-const switchModeBtn = document.getElementById('switch-mode');
 const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
 const loggedInUserSpan = document.getElementById('logged-in-user');
@@ -27,6 +23,9 @@ const filterStatus = document.getElementById('filter-status');
 const statTotal = document.getElementById('stat-total');
 const statPending = document.getElementById('stat-pending');
 const statCompleted = document.getElementById('stat-completed');
+const authTitle = document.getElementById('auth-subtitle');
+const authSwitchText = document.getElementById('auth-switch-text');
+const switchModeBtn = document.getElementById('switch-mode');
 
 let isLoginMode = true;
 let tasks = [];
@@ -49,38 +48,39 @@ socket.on('taskDeleted', (deletedId) => {
     renderTasks();
 });
 
-// Clean Auth Mode Switcher
-function updateAuthUI() {
-    if (isLoginMode) {
-        authTitle.textContent = 'Sign in to manage your workflow';
-        authBtn.textContent = 'Login';
-        authSwitchText.innerHTML = 'Don\'t have an account? <a href="#" id="switch-mode">Register</a>';
-    } else {
-        authTitle.textContent = 'Create an account to get started';
-        authBtn.textContent = 'Register';
-        authSwitchText.innerHTML = 'Already have an account? <a href="#" id="switch-mode">Login</a>';
-    }
-    const newSwitchBtn = document.getElementById('switch-mode');
-    if (newSwitchBtn) {
-        newSwitchBtn.addEventListener('click', handleModeSwitch);
-    }
-}
-
-function handleModeSwitch(e) {
-    e.preventDefault();
-    isLoginMode = !isLoginMode;
-    updateAuthUI();
-}
-
+// Mode Switcher
 if (switchModeBtn) {
-    switchModeBtn.addEventListener('click', handleModeSwitch);
+    switchModeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        isLoginMode = !isLoginMode;
+        if (isLoginMode) {
+            authTitle.textContent = 'Sign in to manage your workflow';
+            authBtn.textContent = 'Login';
+            authSwitchText.innerHTML = 'Don\'t have an account? <a href="#" id="switch-mode">Register</a>';
+        } else {
+            authTitle.textContent = 'Create an account to get started';
+            authBtn.textContent = 'Register';
+            authSwitchText.innerHTML = 'Already have an account? <a href="#" id="switch-mode">Login</a>';
+        }
+        // Re-bind switch listener
+        setTimeout(() => {
+            const newSwitch = document.getElementById('switch-mode');
+            if (newSwitch) newSwitch.addEventListener('click', arguments.callee);
+        }, 100);
+    });
 }
 
-// Auth Form Submit
-authForm.addEventListener('submit', async (e) => {
+// Direct Button Click Handler (Bypasses Extension Form Interception)
+authBtn.addEventListener('click', async (e) => {
     e.preventDefault();
     const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
+
+    if (!username || !password) {
+        alert('Please enter both username and password.');
+        return;
+    }
+
     const endpoint = isLoginMode ? `${API_URL}/auth/login` : `${API_URL}/auth/register`;
 
     try {
@@ -97,13 +97,20 @@ authForm.addEventListener('submit', async (e) => {
             localStorage.setItem('token', data.token);
             localStorage.setItem('username', data.username);
             
-            // Transition directly without reload loops
-            showDashboard(data.username);
+            // Force direct inline style transition (ignores extensions & CSS classes)
+            authSection.style.display = 'none';
+            dashboardSection.style.display = 'block';
+            dashboardSection.classList.remove('hidden');
+            authSection.classList.add('hidden');
+            
+            loggedInUserSpan.textContent = `👤 ${data.username}`;
             fetchTasks();
         } else {
             alert('Registration successful! Please login.');
             isLoginMode = true;
-            updateAuthUI();
+            authTitle.textContent = 'Sign in to manage your workflow';
+            authBtn.textContent = 'Login';
+            authSwitchText.innerHTML = 'Don\'t have an account? <a href="#" id="switch-mode">Register</a>';
         }
     } catch (err) {
         alert(err.message);
@@ -114,31 +121,26 @@ authForm.addEventListener('submit', async (e) => {
 logoutBtn.addEventListener('click', () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    showAuth();
-});
-
-function showDashboard(username) {
-    authSection.classList.add('hidden');
-    dashboardSection.classList.remove('hidden');
-    loggedInUserSpan.textContent = `👤 ${username}`;
-}
-
-function showAuth() {
-    authSection.classList.remove('hidden');
-    dashboardSection.classList.add('hidden');
+    authSection.style.display = 'flex';
+    dashboardSection.style.display = 'none';
     usernameInput.value = '';
     passwordInput.value = '';
-}
+});
 
-// Check Auth State on Load
+// Check Auth on Load
 function checkAuth() {
     const token = localStorage.getItem('token');
     const username = localStorage.getItem('username');
     if (token && username) {
-        showDashboard(username);
+        authSection.style.display = 'none';
+        dashboardSection.style.display = 'block';
+        dashboardSection.classList.remove('hidden');
+        authSection.classList.add('hidden');
+        loggedInUserSpan.textContent = `👤 ${username}`;
         fetchTasks();
     } else {
-        showAuth();
+        authSection.style.display = 'flex';
+        dashboardSection.style.display = 'none';
     }
 }
 
@@ -150,14 +152,12 @@ async function fetchTasks() {
         const res = await fetch(`${API_URL}/tasks`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (res.status === 401 || res.status === 403) {
-            // Token expired or invalid
+        if (!res.ok) {
             localStorage.removeItem('token');
             localStorage.removeItem('username');
-            showAuth();
+            checkAuth();
             return;
         }
-        if (!res.ok) throw new Error('Failed to fetch tasks');
         tasks = await res.json();
         renderTasks();
     } catch (err) {
@@ -165,7 +165,7 @@ async function fetchTasks() {
     }
 }
 
-// Task Form Submit (Create or Update)
+// Task Form Submit
 taskForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
@@ -196,7 +196,7 @@ taskForm.addEventListener('submit', async (e) => {
     }
 });
 
-// Render Tasks & Stats
+// Render Tasks
 function renderTasks() {
     const searchQuery = searchInput.value.toLowerCase();
     const selectedFilter = filterStatus.value;
@@ -207,7 +207,6 @@ function renderTasks() {
         return matchesSearch && matchesFilter;
     });
 
-    // Update Stats
     statTotal.textContent = tasks.length;
     statPending.textContent = tasks.filter(t => t.status === 'Pending').length;
     statCompleted.textContent = tasks.filter(t => t.status === 'Completed').length;
@@ -236,7 +235,6 @@ function renderTasks() {
     });
 }
 
-// Edit Task
 window.editTask = function(id) {
     const task = tasks.find(t => t._id === id);
     if (!task) return;
@@ -248,7 +246,6 @@ window.editTask = function(id) {
     saveTaskBtn.textContent = 'Update Task';
 };
 
-// Delete Task
 window.deleteTask = async function(id) {
     const token = localStorage.getItem('token');
     if (!confirm('Are you sure you want to delete this task?')) return;
@@ -280,5 +277,4 @@ function escapeHtml(str) {
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Initial check on load
 checkAuth();
