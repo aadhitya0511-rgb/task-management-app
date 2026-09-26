@@ -14,17 +14,9 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }
 });
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Request Logger to debug routes
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
-  next();
-});
-
-// --- MONGODB MODELS ---
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true, lowercase: true },
   password: { type: String, required: true }
@@ -39,12 +31,10 @@ const taskSchema = new mongoose.Schema({
 });
 const Task = mongoose.model('Task', taskSchema);
 
-// Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB Connected Successfully'))
   .catch((err) => console.error('MongoDB Connection Error:', err));
 
-// --- AUTHENTICATION ROUTES ---
 app.post('/api/auth/register', async (req, res) => {
   try {
     let { username, password } = req.body;
@@ -60,7 +50,6 @@ app.post('/api/auth/register', async (req, res) => {
     
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
-    console.error('Register error:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -72,10 +61,14 @@ app.post('/api/auth/login', async (req, res) => {
     username = username.trim().toLowerCase();
 
     const user = await User.findOne({ username });
-    if (!user) return res.status(400).json({ message: 'Invalid username or password' });
+    if (!user) {
+      return res.status(400).json({ message: 'User not found! Please register first.' });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Invalid username or password' });
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Incorrect password! Please try again.' });
+    }
 
     const token = jwt.sign(
       { id: user._id, username: user.username }, 
@@ -85,12 +78,10 @@ app.post('/api/auth/login', async (req, res) => {
     
     res.json({ token, username: user.username });
   } catch (err) {
-    console.error('Login error:', err);
     res.status(500).json({ message: err.message });
   }
 });
 
-// --- JWT MIDDLEWARE ---
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -103,7 +94,6 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-// --- TASK CRUD ROUTES ---
 app.get('/api/tasks', verifyToken, async (req, res) => {
   try {
     const tasks = await Task.find({ user: req.user.id });
@@ -152,20 +142,16 @@ app.delete('/api/tasks/:id', verifyToken, async (req, res) => {
   }
 });
 
-// --- SOCKET.IO ---
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
   socket.on('disconnect', () => {});
 });
 
-// --- STATIC FILES & CATCH-ALL ---
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Start Server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
