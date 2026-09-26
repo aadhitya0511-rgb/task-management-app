@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Task Management App</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Socket.io client -->
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Auth Section -->
+        <div id="auth-section" class="card">
+            <h2 id="auth-title">Login</h2>
+            <form id="auth-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" id="auth-btn" class="btn primary">Login</button>
+            </form>
+            <p id="auth-switch-text">
+                Don't have an account? <a href="#" id="switch-mode">Register</a>
+            </p>
+        </div>
+
+        <!-- Dashboard Section (Hidden by default) -->
+        <div id="dashboard-section" class="hidden">
+            <header class="dashboard-header">
+                <h1>Task Dashboard</h1>
+                <div class="user-info">
+                    <span id="logged-in-user"></span>
+                    <button id="logout-btn" class="btn danger">Logout</button>
+                </div>
+            </header>
+
+            <div class="task-container">
+                <!-- Create/Edit Task Form -->
+                <div class="card task-form-card">
+                    <h3>Add New Task</h3>
+                    <form id="task-form">
+                        <input type="hidden" id="task-id">
+                        <div class="form-group">
+                            <label for="title">Title</label>
+                            <input type="text" id="title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <textarea id="description" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="status">Status</label>
+                            <select id="status">
+                                <option value="Pending">Pending</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn primary" id="save-task-btn">Add Task</button>
+                    </form>
+                </div>
+
+                <!-- Task List -->
+                <div class="card task-list-card">
+                    <h3>Your Tasks</h3>
+                    <div id="tasks-list" class="tasks-grid">
+                        <!-- Tasks will be dynamically injected here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
