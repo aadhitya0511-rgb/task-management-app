@@ -11,19 +11,22 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE"]
-  }
+  cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }
 });
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
+// Request Logger to debug routes
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
 // --- MONGODB MODELS ---
 const userSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true },
+  username: { type: String, required: true, unique: true, trim: true, lowercase: true },
   password: { type: String, required: true }
 });
 const User = mongoose.model('User', userSchema);
@@ -44,31 +47,45 @@ mongoose.connect(process.env.MONGO_URI)
 // --- AUTHENTICATION ROUTES ---
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    let { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ message: 'Username and password are required' });
+    username = username.trim().toLowerCase();
+
     const existingUser = await User.findOne({ username });
     if (existingUser) return res.status(400).json({ message: 'Username already taken' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = new User({ username, password: hashedPassword });
     await newUser.save();
+    
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
+    console.error('Register error:', err);
     res.status(500).json({ message: err.message });
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    let { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ message: 'Username and password are required' });
+    username = username.trim().toLowerCase();
+
     const user = await User.findOne({ username });
-    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+    if (!user) return res.status(400).json({ message: 'Invalid username or password' });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+    if (!isMatch) return res.status(400).json({ message: 'Invalid username or password' });
 
-    const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_SECRET || 'secretKey', { expiresIn: '1d' });
+    const token = jwt.sign(
+      { id: user._id, username: user.username }, 
+      process.env.JWT_SECRET || 'secretKey', 
+      { expiresIn: '1d' }
+    );
+    
     res.json({ token, username: user.username });
   } catch (err) {
+    console.error('Login error:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -138,9 +155,7 @@ app.delete('/api/tasks/:id', verifyToken, async (req, res) => {
 // --- SOCKET.IO ---
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
+  socket.on('disconnect', () => {});
 });
 
 // --- STATIC FILES & CATCH-ALL ---
