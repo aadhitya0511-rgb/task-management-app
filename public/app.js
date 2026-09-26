@@ -51,10 +51,8 @@ socket.on('taskDeleted', (deletedId) => {
     renderTasks();
 });
 
-// Switch between Login and Register
-switchModeBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    isLoginMode = !isLoginMode;
+// Clean Auth Mode Switcher
+function updateAuthUI() {
     if (isLoginMode) {
         authTitle.textContent = 'Sign in to manage your workflow';
         authBtn.textContent = 'Login';
@@ -64,9 +62,16 @@ switchModeBtn.addEventListener('click', (e) => {
         authBtn.textContent = 'Register';
         authSwitchText.innerHTML = 'Already have an account? <a href="#" id="switch-mode">Login</a>';
     }
-    // Re-attach listener to newly created switch link
-    document.getElementById('switch-mode').addEventListener('click', arguments.callee);
-});
+    document.getElementById('switch-mode').addEventListener('click', handleModeSwitch);
+}
+
+function handleModeSwitch(e) {
+    e.preventDefault();
+    isLoginMode = !isLoginMode;
+    updateAuthUI();
+}
+
+switchModeBtn.addEventListener('click', handleModeSwitch);
 
 // Auth Form Submit
 authForm.addEventListener('submit', async (e) => {
@@ -95,7 +100,7 @@ authForm.addEventListener('submit', async (e) => {
         } else {
             alert('Registration successful! Please login.');
             isLoginMode = true;
-            authBtn.click();
+            updateAuthUI();
         }
     } catch (err) {
         alert(err.message);
