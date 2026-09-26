@@ -3,7 +3,7 @@ const socket = io();
 const authSection = document.getElementById('auth-section');
 const dashboardSection = document.getElementById('dashboard-section');
 const authForm = document.getElementById('auth-form');
-const authTitle = document.getElementById('auth-title');
+const authTitle = document.getElementById('auth-subtitle');
 const authBtn = document.getElementById('auth-btn');
 const authSwitchText = document.getElementById('auth-switch-text');
 const usernameInput = document.getElementById('username');
@@ -12,36 +12,43 @@ const loggedInUserSpan = document.getElementById('logged-in-user');
 const logoutBtn = document.getElementById('logout-btn');
 
 const taskForm = document.getElementById('task-form');
+const formTitle = document.getElementById('form-title');
 const taskIdInput = document.getElementById('task-id');
 const titleInput = document.getElementById('title');
 const descriptionInput = document.getElementById('description');
 const statusInput = document.getElementById('status');
 const saveTaskBtn = document.getElementById('save-task-btn');
 const tasksList = document.getElementById('tasks-list');
+const searchInput = document.getElementById('search-input');
+const filterStatus = document.getElementById('filter-status');
+
+const statTotal = document.getElementById('stat-total');
+const statPending = document.getElementById('stat-pending');
+const statCompleted = document.getElementById('stat-completed');
 
 let isLoginMode = true;
 let token = localStorage.getItem('token') || '';
 let currentUser = localStorage.getItem('username') || '';
+let allTasks = [];
 
-// Initialize state
 if (token) {
     showDashboard();
 }
 
-// Toggle between Login and Register using event delegation
+// Toggle Login/Register
 document.addEventListener('click', (e) => {
     if (e.target && e.target.id === 'switch-mode') {
         e.preventDefault();
         isLoginMode = !isLoginMode;
-        authTitle.textContent = isLoginMode ? 'Login' : 'Register';
         authBtn.textContent = isLoginMode ? 'Login' : 'Register';
+        authTitle.textContent = isLoginMode ? 'Sign in to manage your workflow' : 'Create a new account';
         authSwitchText.innerHTML = isLoginMode 
             ? `Don't have an account? <a href="#" id="switch-mode">Register</a>`
             : `Already have an account? <a href="#" id="switch-mode">Login</a>`;
     }
 });
 
-// Handle Auth Submission
+// Auth Submit
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = usernameInput.value;
@@ -55,8 +62,7 @@ authForm.addEventListener('submit', async (e) => {
             body: JSON.stringify({ username, password })
         });
         const data = await res.json();
-
-        if (!res.ok) throw new Error(data.message || 'Authentication failed');
+        if (!res.ok) throw new Error(data.message || 'Auth failed');
 
         if (isLoginMode) {
             token = data.token;
@@ -67,8 +73,8 @@ authForm.addEventListener('submit', async (e) => {
         } else {
             alert('Registration successful! Please login.');
             isLoginMode = true;
-            authTitle.textContent = 'Login';
             authBtn.textContent = 'Login';
+            authTitle.textContent = 'Sign in to manage your workflow';
             authSwitchText.innerHTML = `Don't have an account? <a href="#" id="switch-mode">Register</a>`;
             authForm.reset();
         }
@@ -91,54 +97,76 @@ logoutBtn.addEventListener('click', () => {
 function showDashboard() {
     authSection.classList.add('hidden');
     dashboardSection.classList.remove('hidden');
-    loggedInUserSpan.textContent = `Welcome, ${currentUser}`;
+    loggedInUserSpan.textContent = `👤 ${currentUser}`;
     fetchTasks();
 }
 
-// Fetch Tasks
 async function fetchTasks() {
     try {
         const res = await fetch('/api/tasks', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) throw new Error('Failed to fetch tasks');
-        const tasks = await res.json();
-        renderTasks(tasks);
+        allTasks = await res.json();
+        filterAndRenderTasks();
     } catch (err) {
-        console.error('Error fetching tasks:', err);
+        console.error(err);
     }
 }
 
-// Render Tasks
-function renderTasks(tasks) {
+// Render Tasks & Stats
+function filterAndRenderTasks() {
+    const searchTerm = searchInput.value.toLowerCase();
+    const statusFilter = filterStatus.value;
+
+    const filtered = allTasks.filter(task => {
+        const matchesSearch = task.title.toLowerCase().includes(searchTerm) || (task.description && task.description.toLowerCase().includes(searchTerm));
+        const matchesStatus = statusFilter === 'All' || task.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
+    // Update stats counters
+    statTotal.textContent = allTasks.length;
+    statPending.textContent = allTasks.filter(t => t.status === 'Pending' || t.status === 'In Progress').length;
+    statCompleted.textContent = allTasks.filter(t => t.status === 'Completed').length;
+
     tasksList.innerHTML = '';
-    if (tasks.length === 0) {
-        tasksList.innerHTML = '<p>No tasks found. Create one above!</p>';
+    if (filtered.length === 0) {
+        tasksList.innerHTML = '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center; padding: 40px;">No tasks found.</p>';
         return;
     }
 
-    tasks.forEach(task => {
+    filtered.forEach(task => {
         const card = document.createElement('div');
         card.className = 'task-card';
+        let statusClass = 'status-pending';
+        if (task.status === 'In Progress') statusClass = 'status-in-progress';
+        if (task.status === 'Completed') statusClass = 'status-completed';
+
         card.innerHTML = `
-            <h4>${task.title}</h4>
-            <p>${task.description || 'No description'}</p>
-            <p><strong>Status:</strong> ${task.status}</p>
+            <div>
+                <span class="status-badge ${statusClass}">${task.status}</span>
+                <h4 style="margin-top: 10px;">${task.title}</h4>
+                <p>${task.description || 'No description provided.'}</p>
+            </div>
             <div class="task-actions">
-                <button class="btn primary" onclick="editTask('${task._id}', '${escapeAttr(task.title)}', '${escapeAttr(task.description || '')}', '${task.status}')">Edit</button>
-                <button class="btn danger" onclick="deleteTask('${task._id}')">Delete</button>
+                <button class="btn btn-edit" onclick="editTask('${task._id}', '${escapeAttr(task.title)}', '${escapeAttr(task.description || '')}', '${task.status}')">Edit</button>
+                <button class="btn btn-delete" onclick="deleteTask('${task._id}')">Delete</button>
             </div>
         `;
         tasksList.appendChild(card);
     });
 }
 
-// Helper to escape quotes for inline onclick handlers
 function escapeAttr(str) {
     return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
-// Create or Update Task
+// Search and Filter Listeners
+searchInput.addEventListener('input', filterAndRenderTasks);
+filterStatus.addEventListener('change', filterAndRenderTasks);
+
+// Create / Update Task
 taskForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = taskIdInput.value;
@@ -158,45 +186,42 @@ taskForm.addEventListener('submit', async (e) => {
             },
             body: JSON.stringify({ title, description, status })
         });
-
         if (!res.ok) throw new Error('Failed to save task');
 
         taskForm.reset();
         taskIdInput.value = '';
-        saveTaskBtn.textContent = 'Add Task';
+        formTitle.textContent = '✨ Add New Task';
+        saveTaskBtn.textContent = 'Create Task';
         fetchTasks();
     } catch (err) {
         alert(err.message);
     }
 });
 
-// Edit Task Helper
 window.editTask = function(id, title, description, status) {
     taskIdInput.value = id;
     titleInput.value = title;
     descriptionInput.value = description;
     statusInput.value = status;
+    formTitle.textContent = '✏️ Edit Task';
     saveTaskBtn.textContent = 'Update Task';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Delete Task
 window.deleteTask = async function(id) {
     if (!confirm('Are you sure you want to delete this task?')) return;
-
     try {
         const res = await fetch(`/api/tasks/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-
-        if (!res.ok) throw new Error('Failed to delete task');
+        if (!res.ok) throw new Error('Failed to delete');
         fetchTasks();
     } catch (err) {
         alert(err.message);
     }
 }
 
-// Socket.io Real-time listeners
 socket.on('taskCreated', () => fetchTasks());
 socket.on('taskUpdated', () => fetchTasks());
 socket.on('taskDeleted', () => fetchTasks());

@@ -3,24 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Task Management App</title>
+    <title>TaskFlow - Modern Task Management</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Socket.io client -->
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <div class="container">
-        <!-- Auth Section -->
-        <div id="auth-section" class="card">
-            <h2 id="auth-title">Login</h2>
+    <!-- Auth Screen -->
+    <div id="auth-section" class="auth-wrapper">
+        <div class="card auth-card">
+            <div class="auth-header">
+                <h2>⚡ TaskFlow</h2>
+                <p id="auth-subtitle">Sign in to manage your workflow</p>
+            </div>
             <form id="auth-form">
                 <div class="form-group">
                     <label for="username">Username</label>
-                    <input type="text" id="username" required>
+                    <input type="text" id="username" placeholder="Enter your username" required>
                 </div>
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" required>
+                    <input type="password" id="password" placeholder="••••••••" required>
                 </div>
                 <button type="submit" id="auth-btn" class="btn primary">Login</button>
             </form>
@@ -28,30 +30,51 @@
                 Don't have an account? <a href="#" id="switch-mode">Register</a>
             </p>
         </div>
+    </div>
 
-        <!-- Dashboard Section (Hidden by default) -->
-        <div id="dashboard-section" class="hidden">
-            <header class="dashboard-header">
-                <h1>Task Dashboard</h1>
-                <div class="user-info">
-                    <span id="logged-in-user"></span>
-                    <button id="logout-btn" class="btn danger">Logout</button>
-                </div>
-            </header>
+    <!-- Dashboard Screen -->
+    <div id="dashboard-section" class="hidden dashboard-wrapper">
+        <!-- Top Navigation Bar -->
+        <header class="navbar">
+            <div class="nav-brand">
+                <h2>⚡ TaskFlow</h2>
+            </div>
+            <div class="nav-stats">
+                <span class="stat-pill">Total: <strong id="stat-total">0</strong></span>
+                <span class="stat-pill pending">Pending: <strong id="stat-pending">0</strong></span>
+                <span class="stat-pill completed">Completed: <strong id="stat-completed">0</strong></span>
+            </div>
+            <div class="user-info">
+                <span id="logged-in-user"></span>
+                <button id="logout-btn" class="btn logout-btn">Logout</button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Search & Filter Bar -->
+            <div class="toolbar">
+                <input type="text" id="search-input" placeholder="🔍 Search tasks by title..." class="search-box">
+                <select id="filter-status" class="filter-dropdown">
+                    <option value="All">All Statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                </select>
+            </div>
 
             <div class="task-container">
-                <!-- Create/Edit Task Form -->
+                <!-- Create/Edit Task Form Card -->
                 <div class="card task-form-card">
-                    <h3>Add New Task</h3>
+                    <h3 id="form-title">✨ Add New Task</h3>
                     <form id="task-form">
                         <input type="hidden" id="task-id">
                         <div class="form-group">
                             <label for="title">Title</label>
-                            <input type="text" id="title" required>
+                            <input type="text" id="title" placeholder="What needs to be done?" required>
                         </div>
                         <div class="form-group">
                             <label for="description">Description</label>
-                            <textarea id="description" rows="3"></textarea>
+                            <textarea id="description" rows="3" placeholder="Add extra details..."></textarea>
                         </div>
                         <div class="form-group">
                             <label for="status">Status</label>
@@ -61,19 +84,19 @@
                                 <option value="Completed">Completed</option>
                             </select>
                         </div>
-                        <button type="submit" class="btn primary" id="save-task-btn">Add Task</button>
+                        <button type="submit" class="btn primary" id="save-task-btn">Create Task</button>
                     </form>
                 </div>
 
-                <!-- Task List -->
-                <div class="card task-list-card">
+                <!-- Task Grid List -->
+                <div class="task-list-wrapper">
                     <h3>Your Tasks</h3>
                     <div id="tasks-list" class="tasks-grid">
-                        <!-- Tasks will be dynamically injected here -->
+                        <!-- Tasks dynamically injected -->
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 
     <script src="app.js"></script>
